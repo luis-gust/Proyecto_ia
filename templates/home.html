@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Movie AI - Recomendador</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #0f0f0f; --card: #1e1e1e; --red: #e50914; --text: #fff; --green: #4caf50; }
+        body { font-family: 'Poppins', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+        .hero { text-align: center; padding: 50px; background: #1a1a1a; }
+        input { padding: 15px; width: 300px; border-radius: 25px; border: none; outline: none; }
+        button { padding: 15px 30px; border-radius: 25px; border: none; background: var(--red); color: white; cursor: pointer; font-weight: bold; }
+        .container { max-width: 1100px; margin: auto; padding: 20px; }
+
+        /* Estilos del Veredicto */
+        .verdict-box { background: var(--card); border-radius: 15px; padding: 30px; text-align: center; margin-bottom: 40px; border: 1px solid #333; }
+        .percent { font-size: 60px; font-weight: bold; margin: 0; }
+        .progress-bar { background: #333; height: 12px; border-radius: 6px; margin: 20px auto; width: 80%; overflow: hidden; }
+
+        .movie-content { display: flex; gap: 30px; margin-top: 30px; }
+        .poster { width: 300px; border-radius: 15px; }
+        .reviews-grid { display: grid; gap: 15px; margin-top: 20px; }
+        .review-card { background: var(--card); padding: 15px; border-radius: 10px; border-left: 5px solid gray; }
+        .Good { border-left-color: var(--green); }
+        .Bad { border-left-color: var(--red); }
+        .recs { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 20px; }
+        .rec-item { min-width: 150px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="hero">
+    <h1>Analizador de Películas IA</h1>
+    <input type="text" id="movie_name" placeholder="Escribe una película en inglés...">
+    <button onclick="getRecommendations()">Analizar</button>
+</div>
+
+{% if title %}
+<div class="container">
+    <div class="movie-content">
+        <img src="{{ poster }}" class="poster">
+        <div>
+            <h1>{{ title }}</h1>
+            <p><strong>Fecha:</strong> {{ release_date }} | <strong>Puntaje:</strong> {{ vote_average }}/10</p>
+            <p>{{ overview }}</p>
+        </div>
+    </div>
+
+    {% if reviews_stats and reviews_stats.total > 0 %}
+    <div class="verdict-box">
+        <h2 style="color: #ffc107;">Veredicto de la Inteligencia Artificial</h2>
+        <p class="percent" style="color: {{ '#4caf50' if reviews_stats.percent >= 60 else '#f44336' }};">
+            {{ reviews_stats.percent }}%
+        </p>
+        <p style="text-transform: uppercase; letter-spacing: 2px;">Aprobación de la Crítica (IA)</p>
+
+        <div class="progress-bar">
+            <div style="background: {{ '#4caf50' if reviews_stats.percent >= 60 else '#f44336' }};
+                        height: 100%; width: {{ reviews_stats.percent }}%; transition: width 1s;"></div>
+        </div>
+
+        <p style="font-size: 14px; color: #aaa;">
+            Basado en el análisis de sentimiento de {{ reviews_stats.total }} reseñas reales de IMDB.
+        </p>
+    </div>
+    {% endif %}
+
+    <h2>Películas Recomendadas</h2>
+    <div class="recs">
+        {% for p, t in movie_cards.items() %}
+        <div class="rec-item">
+            <img src="{{ p }}" style="width: 100%; border-radius: 10px;">
+            <p>{{ t }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <h2>Reseñas Analizadas</h2>
+    <div class="reviews-grid">
+        {% for rev, sent in movie_reviews.items() %}
+        <div class="review-card {{ sent }}">
+            <small style="color: {{ '#4caf50' if sent == 'Good' else '#f44336' }}; font-weight: bold;">{{ sent }}</small>
+            <p style="font-style: italic;">"{{ rev }}"</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<script>
+    async function getRecommendations() {
+        const name = document.getElementById('movie_name').value;
+        if(!name) return alert("Escribe una película");
+
+        // 1. Obtener ID y Datos de TMDB
+        const API_KEY = '8265bd1679663a7ea12ac168da84d2e8'; // Tu clave API
+        const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${name}`);
+        const data = await res.json();
+
+        if(data.results.length === 0) return alert("No encontrada");
+        const movie = data.results[0];
+        const movie_id = movie.id;
+
+        // 2. Obtener recomendaciones de Python
+        const resp = await fetch('/similarity', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `name=${movie.title}`
+        });
+        const rec_names = await resp.text();
+        const names_array = rec_names.split('---');
+
+        // 3. Obtener pósters de las recomendadas
+        let posters = [];
+        for(let m of names_array){
+            const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${m}`);
+            const d = await r.json();
+            if(d.results[0]) posters.push(`https://image.tmdb.org/t/p/w200${d.results[0].poster_path}`);
+        }
+
+        // 4. Obtener IMDB ID para el scraping
+        const detail = await fetch(`https://api.themoviedb.org/3/movie/${movie_id}?api_key=${API_KEY}`);
+        const movie_detail = await detail.json();
+
+        // Enviar formulario final para renderizar todo
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/recommend';
+
+        const fields = {
+            'title': movie.title,
+            'imdb_id': movie_detail.imdb_id,
+            'poster': `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+            'overview': movie.overview,
+            'rating': movie.vote_average,
+            'release_date': movie.release_date,
+            'runtime': movie_detail.runtime,
+            'rec_movies': rec_names,
+            'rec_posters': posters.join('---')
+        };
+
+        for(let key in fields){
+            const input = document.createElement('input');
+            input.type = 'hidden'; input.name = key; input.value = fields[key];
+            form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
+    }
+</script>
+</body>
+</html>

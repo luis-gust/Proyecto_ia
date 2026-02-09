@@ -1,40 +1,46 @@
-# Recomendador de Películas con Análisis de Sentimiento
+# Movie AI: Sistema de Recomendación y Análisis de Sentimiento con IA
 
-## Planteamiento del Proyecto
-
-La idea principal de este proyecto es desarrollar una aplicación web que permita a los usuarios obtener recomendaciones de películas basadas en la similitud de contenido y, además, analizar el sentimiento de las reseñas de usuarios sobre dichas películas. El sistema combinará técnicas de procesamiento de lenguaje natural (NLP) y machine learning para ofrecer una experiencia interactiva y personalizada.
-
-### Objetivo General
-
-Crear una plataforma donde el usuario pueda:
-- Buscar una película de su interés.
-- Recibir recomendaciones de películas similares.
-- Visualizar reseñas de usuarios y conocer el análisis automático de sentimiento (positivo o negativo) de cada reseña.
-
-### Justificación
-
-Actualmente, la cantidad de contenido audiovisual disponible es abrumadora. Un sistema que ayude a descubrir nuevas películas y que, además, analice automáticamente las opiniones de otros usuarios, puede mejorar significativamente la experiencia de búsqueda y selección de películas.
-
-## ¿Cómo se ejecutará la idea?
-
-1. **Interfaz Web**: Se desarrollará una aplicación web sencilla donde el usuario podrá ingresar el nombre de una película.
-2. **Recomendación**: El sistema buscará películas similares utilizando técnicas de NLP para comparar descripciones, géneros y otros metadatos.
-3. **Análisis de Sentimiento**: Se recopilarán reseñas de usuarios (por ejemplo, desde IMDB) y se aplicará un modelo de machine learning previamente entrenado para clasificar cada reseña como positiva o negativa.
-4. **Presentación de Resultados**: El usuario verá una lista de películas recomendadas junto con las reseñas y su análisis de sentimiento.
-
-## Ejecución esperada
-
-- El usuario accede a la web y busca una película.
-- El sistema muestra recomendaciones y reseñas analizadas.
-- Todo el procesamiento de texto y predicción de sentimiento se realiza automáticamente en el backend.
-
-## Tecnologías sugeridas
-
-- Python (Flask para la web, scikit-learn para ML)
-- HTML/CSS para la interfaz
-- Pandas y Numpy para manejo de datos
-- BeautifulSoup/Requests para scraping de reseñas
+## 1. Introducción
+**Movie AI** es una solución tecnológica diseñada para transformar la interacción del usuario con el cine. No es solo un motor de búsqueda; es una plataforma que integra **Procesamiento de Lenguaje Natural (NLP)** y **Aprendizaje Automático (Machine Learning)** para ofrecer una experiencia doble:
+1.  **Recomendación Inteligente:** Encuentra películas similares basándose en el "ADN" del contenido (actores, directores, géneros).
+2.  **Veredicto de la Crítica (IA):** Analiza en tiempo real las reseñas de IMDB para determinar, mediante un modelo predictivo, el porcentaje de aprobación real de la audiencia.
 
 ---
 
-Este README describe la visión y el planteamiento inicial del proyecto. El desarrollo posterior incluirá la definición de la arquitectura, la recolección de datos, el entrenamiento de modelos y la implementación de la interfaz web.
+## 2. Desarrollo Técnico: El Corazón de la IA
+
+El proyecto implementa dos tipos de inteligencia artificial para resolver problemas distintos.
+
+### A. Clasificación de Sentimientos (Machine Learning Supervisado)
+Para entender si una reseña es positiva o negativa, la IA pasa por un proceso de aprendizaje en el archivo `train_sentiment.py`.
+
+#### Paso a paso del aprendizaje:
+1.  **Vectorización (TF-IDF):** Las palabras se convierten en números. Utilizamos `TfidfVectorizer` para que la IA entienda qué palabras son clave (ej. "Masterpiece", "Waste") y cuáles son irrelevantes (ej. "the", "a").
+    ```python
+    vectorizer = TfidfVectorizer(stop_words='english')
+    X = vectorizer.fit_transform(df['review'])
+    ```
+
+
+2.  **Entrenamiento (Multinomial Naive Bayes):** Es un modelo probabilístico que calcula la probabilidad de que una frase sea "Buena" basándose en la frecuencia de palabras positivas aprendidas.
+    ```python
+    clf = MultinomialNB()
+    clf.fit(X, y) # La IA asocia patrones de texto con etiquetas (1=Good, 0=Bad)
+    ```
+
+
+3.  **Inferencia en Tiempo Real:** En `app.py`, cuando el sistema hace el *scraping* de IMDB, cada reseña nueva pasa por el modelo entrenado:
+    ```python
+    vector = vectorizer.transform([text_imdb]) # Traduce reseña a números
+    prediction = clf.predict(vector)           # La IA da el veredicto (0 o 1)
+    ```
+
+### B. Motor de Recomendación (Similitud del Coseno)
+Para recomendar, la IA trata a cada película como un punto en un mapa de miles de dimensiones. 
+* Se crea una "combinación" de metadatos (Género + Actores + Director).
+* Se utiliza la **Similitud del Coseno** para medir la distancia entre estos puntos. Cuanto más pequeño es el ángulo entre dos vectores, más parecidas son las películas.
+
+```python
+cv = CountVectorizer()
+count_matrix = cv.fit_transform(data['comb'])
+similarity = cosine_similarity(count_matrix)
